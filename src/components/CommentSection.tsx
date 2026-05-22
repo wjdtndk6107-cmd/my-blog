@@ -627,7 +627,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
     const isEditing = editingId === comment.id
     const isReplying = replyingToId === comment.id
     const hasReplies = comment.replies && comment.replies.length > 0
-    const replySummary = hasReplies ? getReplySummary(comment.replies) : ''
+    const replySummary = hasReplies ? getReplySummary(comment.replies ?? []) : ''
 
     return (
       <div key={comment.id} className={isReply ? 'mt-3' : 'pb-4 mb-4 border-b last:border-b-0'}>
