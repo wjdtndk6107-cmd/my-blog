@@ -52,7 +52,6 @@ interface BlockProps {
 function ScheduledBlock({ event, task, category }: BlockProps) {
   const { updateEvent, updateTask, deleteEvent, toggleEvent, addEvent, events } = usePlanner();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const [editing, setEditing] = useState(false);
   const resizingRef = useRef(false);
   const colors = COLOR_MAP[category.color];
 
@@ -61,10 +60,8 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
   );
   const height = durationToHeight(event.durationMinutes);
 
-  // Sync duration to both event and source task
   const applyDuration = (newDur: number) => {
     updateEvent(event.id, { durationMinutes: newDur });
-    updateTask(event.taskId, { estimatedMinutes: newDur });
   };
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -82,9 +79,40 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
 
     const onMove = (me: PointerEvent) => {
       const delta = me.clientY - startY;
-      const slots = Math.round(delta / SLOT_PX);
-      const newDur = Math.max(30, startDur + slots * 30);
+      const slots = Math.round(delta / (SLOT_PX / 2));
+      const newDur = Math.max(15, startDur + slots * 15);
       applyDuration(newDur);
+    };
+    const onUp = () => {
+      resizingRef.current = false;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  const handleResizeTop = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    resizingRef.current = true;
+    const startY = e.clientY;
+    const [h, m] = event.startTime.split(':').map(Number);
+    const origStartMin = h * 60 + m;
+    const endMin = origStartMin + event.durationMinutes; // fixed end
+
+    const onMove = (me: PointerEvent) => {
+      const delta = me.clientY - startY;
+      const slots = Math.round(delta / (SLOT_PX / 2));
+      const rawStart = origStartMin + slots * 15;
+      const newStart = Math.max(0, Math.min(rawStart, endMin - 15));
+      const newDur = endMin - newStart;
+      const newHH = Math.floor(newStart / 60);
+      const newMM = newStart % 60;
+      updateEvent(event.id, {
+        startTime: `${String(newHH).padStart(2, '0')}:${String(newMM).padStart(2, '0')}`,
+        durationMinutes: newDur,
+      });
     };
     const onUp = () => {
       resizingRef.current = false;
@@ -112,7 +140,7 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
       <div
         ref={setNodeRef}
         onContextMenu={handleContextMenu}
-        onClick={() => !isDragging && setEditing(true)}
+
         style={{
           position: 'absolute',
           top,
@@ -154,7 +182,12 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
             {format12(event.startTime)} – {endTime(event.startTime, event.durationMinutes)}
           </div>
         )}
-        {/* Resize handle */}
+        {/* Top resize handle */}
+        <div
+          onPointerDown={handleResizeTop}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, cursor: 'ns-resize', background: 'transparent', zIndex: 11 }}
+        />
+        {/* Bottom resize handle */}
         <div
           onPointerDown={handleResizeDown}
           style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 6, cursor: 'ns-resize', background: 'transparent', zIndex: 11 }}
@@ -168,7 +201,6 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
           onPointerDown={e => e.stopPropagation()}
         >
           {[
-            { label: editing ? '편집 닫기' : '편집', action: () => { setEditing(true); setContextMenu(null); } },
             {
               label: event.completed ? '완료 취소' : '완료',
               action: () => {
@@ -183,9 +215,7 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
             },
             {
               label: '복제', action: () => {
-                const existingTotal = events.filter(e => e.taskId === event.taskId).reduce((sum, e) => sum + e.durationMinutes, 0);
                 addEvent({ taskId: event.taskId, date: event.date, startTime: event.startTime, durationMinutes: event.durationMinutes });
-                updateTask(event.taskId, { estimatedMinutes: existingTotal + event.durationMinutes });
                 setContextMenu(null);
               }
             },
@@ -204,37 +234,7 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
         </div>
       )}
 
-      {/* Edit popover — live: inputs read directly from event prop, onChange updates immediately */}
-      {editing && (
-        <div
-          style={{ position: 'absolute', top: Math.min(top, TOTAL_PX - 140), left: 4, width: 188, background: '#faf8f3', border: '0.5px solid #e0ddd5', borderRadius: 6, padding: 10, zIndex: 300, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', fontFamily: 'Georgia, serif' }}
-          onPointerDown={e => e.stopPropagation()}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontSize: 10, color: '#3d3730', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 }}>{task.title}</span>
-            <button onClick={() => setEditing(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b5ada4', fontSize: 15, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
-          </div>
-          <div style={{ marginBottom: 6 }}>
-            <label style={{ fontSize: 9, color: '#8c8580', display: 'block', marginBottom: 2, letterSpacing: 0.5 }}>시작 시간</label>
-            <input
-              type="time"
-              value={event.startTime}
-              onChange={e => { if (e.target.value) updateEvent(event.id, { startTime: e.target.value }); }}
-              style={{ width: '100%', border: '1px solid #e0ddd5', borderRadius: 3, padding: '3px 5px', fontSize: 10, fontFamily: 'Georgia, serif', background: '#faf8f3', outline: 'none', boxSizing: 'border-box', color: '#3d3730' }}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 9, color: '#8c8580', display: 'block', marginBottom: 2, letterSpacing: 0.5 }}>소요 시간 (분)</label>
-            <input
-              type="number"
-              value={event.durationMinutes}
-              onChange={e => { const v = Math.max(15, Number(e.target.value)); applyDuration(v); }}
-              min={15} step={15}
-              style={{ width: '100%', border: '1px solid #e0ddd5', borderRadius: 3, padding: '3px 5px', fontSize: 10, fontFamily: 'Georgia, serif', background: '#faf8f3', outline: 'none', boxSizing: 'border-box', color: '#3d3730' }}
-            />
-          </div>
-        </div>
-      )}
+
     </>
   );
 }

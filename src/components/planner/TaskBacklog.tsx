@@ -28,6 +28,11 @@ function TaskCard({ task, category }: { task: Task; category: Category }) {
   );
   const isScheduled = events.some(e => e.taskId === task.id && weekDateStrs.includes(e.date));
 
+  // 전체 스케줄 블럭의 소요시간 합산 (0이면 estimatedMinutes 표시)
+  const scheduledTotal = events
+    .filter(e => e.taskId === task.id)
+    .reduce((sum, e) => sum + e.durationMinutes, 0);
+
   // 보더: 배치됨 = solid, 미배치 = dashed
   const borderStyle = isScheduled
     ? `3px solid ${colors.border}`
@@ -123,7 +128,8 @@ function TaskCard({ task, category }: { task: Task; category: Category }) {
             {task.title}
           </div>
           {(() => {
-            const hasMins = task.estimatedMinutes > 0;
+            const displayMins = scheduledTotal > 0 ? scheduledTotal : task.estimatedMinutes;
+            const hasMins = displayMins > 0;
             const hasDue = !!task.dueDate;
             if (!hasMins && !hasDue && !task.note) return null;
             const today = format(new Date(), 'yyyy-MM-dd');
@@ -134,7 +140,7 @@ function TaskCard({ task, category }: { task: Task; category: Category }) {
             const d = hasDue ? parseISO(task.dueDate!) : null;
             const dueLabel = d ? `${overdue ? '⚠ ' : ''}마감 ${d.getMonth() + 1}/${d.getDate()}` : null;
             const parts: React.ReactNode[] = [];
-            if (hasMins) parts.push(<span key="mins">{task.estimatedMinutes}분</span>);
+            if (hasMins) parts.push(<span key="mins">{displayMins}분</span>);
             if (dueLabel) parts.push(
               <span key="due" style={{ color: dueColor, fontWeight: dueFontWeight }}>{dueLabel}</span>
             );
