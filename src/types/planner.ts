@@ -31,7 +31,8 @@ export interface Task {
   estimatedMinutes: number;
   note?: string;
   completed: boolean;
-  dueDate?: string; // YYYY-MM-DD
+  dueDate?: string;     // YYYY-MM-DD
+  completedAt?: string; // YYYY-MM-DD
 }
 
 export interface ScheduledEvent {

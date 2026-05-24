@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { startOfWeek, startOfMonth } from 'date-fns';
+import { startOfWeek, startOfMonth, format } from 'date-fns';
 import type { Category, CategoryColor, Task, ScheduledEvent, Reflection } from '../types/planner';
 
 const DEFAULT_CATEGORIES: Category[] = [
@@ -94,7 +94,10 @@ export function PlannerProvider({ children }: { children: React.ReactNode }) {
         setTasks(p => p.map(t => t.id === id ? { ...t, ...u } : t)),
       deleteTask: id => setTasks(p => p.filter(t => t.id !== id)),
       toggleTask: id =>
-        setTasks(p => p.map(t => t.id === id ? { ...t, completed: !t.completed } : t)),
+        setTasks(p => p.map(t => t.id === id
+          ? { ...t, completed: !t.completed, completedAt: !t.completed ? format(new Date(), 'yyyy-MM-dd') : undefined }
+          : t
+        )),
 
       events,
       addEvent: e =>

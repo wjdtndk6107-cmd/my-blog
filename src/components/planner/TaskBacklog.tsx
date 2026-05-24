@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { addDays, format, parseISO } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { usePlanner } from '../../contexts/PlannerContext';
 import type { Task, Category, CategoryColor } from '../../types/planner';
 import { COLOR_MAP, COLOR_LABELS, ALL_COLORS } from '../../types/planner';
@@ -290,23 +291,76 @@ function CategoryModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Completed Tasks by Month Dropdown ────────────────────────────────────────
+function CompletedMonthSection({ monthKey, tasks: monthTasks, categories }: {
+  monthKey: string;
+  tasks: Task[];
+  categories: Category[];
+}) {
+  const [open, setOpen] = useState(false);
+  const date = parseISO(`${monthKey}-01`);
+  const label = format(date, 'yyyy년 M월', { locale: ko });
+
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
+          fontFamily: 'Georgia, serif',
+        }}
+      >
+        <span style={{ fontSize: 9, color: '#a09890', letterSpacing: 0.8, textTransform: 'uppercase', fontWeight: 600 }}>
+          {label} ({monthTasks.length})
+        </span>
+        <span style={{ fontSize: 10, color: '#b5ada4', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', display: 'inline-block' }}>▾</span>
+      </button>
+      {open && (
+        <div style={{ paddingLeft: 0 }}>
+          {monthTasks.map(task => {
+            const cat = categories.find(c => c.id === task.categoryId) ?? { id: '', name: '기타', color: 'red' as const };
+            return <TaskCard key={task.id} task={task} category={cat} />;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main TaskBacklog ──────────────────────────────────────────────────────────
 export function TaskBacklog() {
   const { categories, tasks, showAddTask, setShowAddTask, viewWeekStart } = usePlanner();
   const [showCatModal, setShowCatModal] = useState(false);
 
   const weekStartStr = format(viewWeekStart, 'yyyy-MM-dd');
-  const visibleTasks = tasks.filter(t => {
+
+  // 완료 태스크
+  const completedTasks = tasks.filter(t => t.completed);
+
+  // 활성 태스크: 미완료이거나, 마감일 있는 미완료
+  const activeTasks = tasks.filter(t => {
+    if (t.completed) return false;
     if (t.dueDate) return t.dueDate >= weekStartStr;
-    return !t.completed;
+    return true;
   });
 
   const tasksByCategory = categories.map(cat => ({
     cat,
-    tasks: visibleTasks.filter(t => t.categoryId === cat.id),
+    tasks: activeTasks.filter(t => t.categoryId === cat.id),
   })).filter(g => g.tasks.length > 0);
 
-  const uncategorized = visibleTasks.filter(t => !categories.some(c => c.id === t.categoryId));
+  const uncategorized = activeTasks.filter(t => !categories.some(c => c.id === t.categoryId));
+
+  // 완료 태스크를 월별 그룹핑 (completedAt 없으면 'unknown')
+  const completedByMonth: Record<string, Task[]> = {};
+  for (const t of completedTasks) {
+    const monthKey = t.completedAt ? t.completedAt.slice(0, 7) : 'unknown';
+    if (!completedByMonth[monthKey]) completedByMonth[monthKey] = [];
+    completedByMonth[monthKey].push(t);
+  }
+  // 최신 월부터 정렬
+  const sortedMonths = Object.keys(completedByMonth).sort((a, b) => b.localeCompare(a));
 
   return (
     <>
@@ -325,6 +379,7 @@ export function TaskBacklog() {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px' }}>
+          {/* 활성 태스크 */}
           {tasksByCategory.map(({ cat, tasks: catTasks }) => {
             const c = COLOR_MAP[cat.color];
             return (
@@ -349,10 +404,31 @@ export function TaskBacklog() {
               ))}
             </div>
           )}
-          {visibleTasks.length === 0 && (
+          {activeTasks.length === 0 && completedTasks.length === 0 && (
             <p style={{ fontSize: 10, color: '#c8c0b8', fontFamily: 'Georgia, serif', fontStyle: 'italic', textAlign: 'center', marginTop: 12 }}>
               작업을 추가하세요
             </p>
+          )}
+
+          {/* 완료 태스크 구분선 + 월별 드롭다운 */}
+          {completedTasks.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <div style={{ flex: 1, height: '0.5px', background: '#d8d3ca' }} />
+                <span style={{ fontSize: 8, color: '#b5ada4', fontFamily: 'Georgia, serif', letterSpacing: 1, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                  완료 {completedTasks.length}
+                </span>
+                <div style={{ flex: 1, height: '0.5px', background: '#d8d3ca' }} />
+              </div>
+              {sortedMonths.map(monthKey => (
+                <CompletedMonthSection
+                  key={monthKey}
+                  monthKey={monthKey === 'unknown' ? format(new Date(), 'yyyy-MM') : monthKey}
+                  tasks={completedByMonth[monthKey]}
+                  categories={categories}
+                />
+              ))}
+            </div>
           )}
         </div>
 

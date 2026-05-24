@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Paper background -->
+  <rect x="15" y="8" width="62" height="78" rx="5" ry="5" fill="#FAFAF8" stroke="#D0CBBF" stroke-width="3"/>
+  <!-- Folded corner -->
+  <polygon points="59,8 77,26 59,26" fill="#E8E3D8" stroke="#D0CBBF" stroke-width="2"/>
+  <!-- Lines on paper -->
+  <line x1="26" y1="40" x2="62" y2="40" stroke="#B8B0A0" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="26" y1="53" x2="62" y2="53" stroke="#B8B0A0" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="26" y1="66" x2="50" y2="66" stroke="#B8B0A0" stroke-width="3.5" stroke-linecap="round"/>
+</svg>

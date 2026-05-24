@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type RefObject } from 'react';
+import { useState, useEffect, type RefObject } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { addDays, format, isToday, isSameDay } from 'date-fns';
@@ -52,7 +52,7 @@ interface BlockProps {
 function ScheduledBlock({ event, task, category }: BlockProps) {
   const { updateEvent, updateTask, deleteEvent, toggleEvent, addEvent, events } = usePlanner();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-  const resizingRef = useRef(false);
+  const [isResizing, setIsResizing] = useState(false);
   const colors = COLOR_MAP[category.color];
 
   const top = minutesToTop(
@@ -67,13 +67,13 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `event-${event.id}`,
     data: { type: 'scheduled-event', eventId: event.id, taskId: event.taskId, durationMinutes: event.durationMinutes },
-    disabled: resizingRef.current,
+    disabled: isResizing,
   });
 
   const handleResizeDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    resizingRef.current = true;
+    setIsResizing(true);
     const startY = e.clientY;
     const startDur = event.durationMinutes;
 
@@ -84,7 +84,7 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
       applyDuration(newDur);
     };
     const onUp = () => {
-      resizingRef.current = false;
+      setIsResizing(false);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
@@ -95,7 +95,7 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
   const handleResizeTop = (e: React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    resizingRef.current = true;
+    setIsResizing(true);
     const startY = e.clientY;
     const [h, m] = event.startTime.split(':').map(Number);
     const origStartMin = h * 60 + m;
@@ -115,7 +115,7 @@ function ScheduledBlock({ event, task, category }: BlockProps) {
       });
     };
     const onUp = () => {
-      resizingRef.current = false;
+      setIsResizing(false);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
